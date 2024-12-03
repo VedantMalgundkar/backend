@@ -19,6 +19,23 @@ const uploadToCloudnary = async (localFilePath)=>{
         return null
     }
 
-}   
+}
 
-export { uploadToCloudnary } 
+const updatetoCloudnary = async (newLocalFile,oldPublicId)=>{
+    
+    if(!newLocalFile) return null
+    const newResponse = await uploadToCloudnary(newLocalFile)
+    
+    let delResponse;
+    try {
+        delResponse = await cloudinary.uploader.destroy(oldPublicId);
+    } catch (error) {
+        console.error("Error deleting image:", error.message);
+        delResponse = { error: error.message };
+    }
+
+    return { newResponse , delResponse}
+
+}
+
+export { uploadToCloudnary , updatetoCloudnary} 
