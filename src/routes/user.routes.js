@@ -36,7 +36,7 @@ router.route("/current-user").get(verifyJWT,getCurrentUser)
 
 router.route("/watchHistory").get(verifyJWT,getWatchHistory)
 
-router.route("/c/:username").get(verifyJWT,getUserChannelProfile)
+router.route("/get-channel-profile/channel/:username").get(verifyJWT,getUserChannelProfile)
 
 
 export default router

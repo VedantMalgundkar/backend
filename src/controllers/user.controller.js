@@ -64,13 +64,19 @@ const registerUser = asyncHandler(async (req,res)=>{
     }
 
     if(!avatarUploadRes){
-        throw ApiError(400,"Avatar file is required")
+        throw ApiError(400,"Avatar file upload failed")
     }
 
     const user = await User.create({
         fullName,
-        avatar:avatarUploadRes.url,
-        coverImage:coverImageUploadRes?.url||"",
+        avatar:{
+            url:avatarUploadRes.url,
+            public_id:avatarUploadRes.public_id
+        },
+        coverImage:{
+            url:coverImageUploadRes?.url||"",
+            public_id:coverImageUploadRes?.public_id||""
+        },
         email,
         password,
         username,
@@ -271,16 +277,20 @@ const updateAvatarUser = asyncHandler(async (req,res)=>{
     
     const user = await User.findById(req.user?._id)
 
-    const avatarUrlPart = user.avatar?.split("/")
-    const oldAvatarPublicId = avatarUrlPart[avatarUrlPart.length-1].split(".")[0].trim()
+    if(!user){
+        throw new ApiError(403,"User not found")
+    }
 
-    const { newResponse , delResponse } = await updatetoCloudnary(req.file.path,oldAvatarPublicId)
+    const { newResponse , delResponse } = await updatetoCloudnary(req.file.path,user.avatar.public_id)
 
     const updatedUser = await User.findByIdAndUpdate(
         req.user._id,
         {
             $set: {
-                avatar: newResponse.url // this removes the field from document
+                avatar:{
+                        url:newResponse.url,
+                        public_id:newResponse.public_id
+                    }
             }
         },
         {
@@ -298,15 +308,22 @@ const updateCoverImageUser = asyncHandler(async (req,res)=>{
     }
     const user = await User.findById(req.user?._id)
 
+    if(!user){
+        throw new ApiError(403,"User not found")
+    }
+
     let updatedUser;
     if (!req.user?.coverImage && req.file.path){
         const coverImageUploadResp = await uploadToCloudnary(req.file.path)
-        
+
         updatedUser = await User.findByIdAndUpdate(
             req.user._id,
             {
                 $set: {
-                    coverImage: coverImageUploadResp.url
+                    coverImage:{
+                        url:coverImageUploadResp.url,
+                        public_id:coverImageUploadResp.public_id
+                    } 
                 }
             },
             {
@@ -315,16 +332,17 @@ const updateCoverImageUser = asyncHandler(async (req,res)=>{
         ).select("-password -refreshToken -watchHistory -createdAt")
 
     }else if (req.user?.coverImage && req.file.path){
-        const coverImageUrlPart = user.coverImage?.split("/")
-        const oldCoverImagePublicId = coverImageUrlPart[coverImageUrlPart.length-1].split(".")[0].trim()
 
-        const { newResponse , delResponse } = await updatetoCloudnary(req.file.path,oldCoverImagePublicId)
+        const { newResponse , delResponse } = await updatetoCloudnary(req.file.path,user.coverImage.public_id)
         
         updatedUser = await User.findByIdAndUpdate(
             req.user._id,
             {
                 $set: {
-                    coverImage: newResponse.url
+                    coverImage:{
+                        url:newResponse.url,
+                        public_id:newResponse.public_id
+                    }
                 }
             },
             {
@@ -346,7 +364,13 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
     const {username} = req.params
 
     if(!username?.trim()){
-        throw new ApiError(400,"username is missing.")
+        throw new ApiError(403,"username is invalid")
+    }
+
+    userChannel = await User.findOne({username:username})
+
+    if (!userChannel){
+        throw new ApiError(402,"Channel does not exsists")
     }
 
     const channel = await User.aggregate([
@@ -376,18 +400,16 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
                 },
                 subscribedToCount:{
                     $size : "$channelSubscribedTo"
+                },
+                isSubscribed:{
+                    $cond:{
+                        if:{$in: [req.user?._id,"$channelSubscribers.subscriber"]},
+                        then: true,
+                        else: false
+                    }
                 }
             }
 
-        },
-        {
-            isSubscribed:{
-                $cond:{
-                    if:{$in: [req.user?._id,"$channelSubscribers.subscriber"]},
-                    then: true,
-                    else: false
-                }
-            }
         },
         {
             $project:{
