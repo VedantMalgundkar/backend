@@ -1,30 +1,26 @@
 import dotenv from "dotenv"
+dotenv.config({ path: './.env' });
+
 import connectDB from "./db/index.js";
 import {app} from './app.js'
-dotenv.config({
-    path: './.env'
-})
+import { seedDatabase } from './utils/seeding.js'
 
 const PORT = process.env.PORT || 8000 
 
 connectDB()
-.then(()=>{
-    app.listen(PORT,()=>{
-        console.log(`server is running on  http://localhost:${PORT}`);
+.then(async () => {
+    try {
+        // await seedDatabase();
+        app.listen(PORT, () => {
+            console.log(`Server is running on http://localhost:${PORT}`);
+        });
+    } catch (error) {
+        console.log(`Error seeding database: ${error}`);
+        }
     })
-})
 .catch((error)=>{
     console.log(`MongoDB connection failed : ${error}`);
 });
-
-
-
-
-
-
-
-
-
 
 
 

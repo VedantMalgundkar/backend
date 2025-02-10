@@ -8,6 +8,81 @@ import { Like } from "../models/like.model.js"
 import { Tweet } from "../models/tweet.model.js"
 
 
+const getLikedVideos = asyncHandler(async (req, res) => {
+    const likeAggregate = await Like.aggregate(
+        [
+            {
+              $match: {
+                likedBy: new mongoose.Types.ObjectId(req.user?._id),//ObjectId("6751bc8191cc59810b5c71d7"),
+                video: {
+                  $exists: true,
+                },
+              },
+            },
+            {
+              $lookup: {
+                from: "videos",
+                localField: "video",
+                foreignField: "_id",
+                as: "likedVideos",
+                pipeline: [
+                  {
+                    $project: {
+                      description: 1,
+                      title: 1,
+                      "videoFile.url": 1,
+                      "thumbnail.url": 1,
+                      owner: 1,
+                      views: 1,
+                      duration: 1,
+                      createdAt: 1,
+                    },
+                  },
+                  {
+                    $lookup: {
+                      from: "users",
+                      localField: "owner",
+                      foreignField: "_id",
+                      as: "videoOwnerDetails",
+                      pipeline: [
+                        {
+                          $project: {
+                            fullName: 1,
+                            username: 1,
+                            "avatar.url": 1,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    $addFields: {
+                      videoOwnerDetails: {
+                        $first: "$videoOwnerDetails",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              $unwind: {
+                path: "$likedVideos",
+              },
+            },
+            {
+              $sort: {
+                createdAt: -1,
+              },
+            },
+          ]
+    
+    )
+    return res.status(200)
+    .json(new ApiResponse(200,likeAggregate,"liked videos fetched successfully"))
+})
+
+
 const toggleVideoLike = asyncHandler(async(req,res)=>{
     const { videoId } = req.params
 
@@ -150,4 +225,7 @@ const toggleTweetLike = asyncHandler(async(req,res)=>{
     .json(new ApiResponse(200,{isLiked:true},"Twwet liked successfully."))
 })
 
-export {toggleVideoLike,toggleCommentLike,toggleTweetLike}
+export {toggleVideoLike,
+        toggleCommentLike,
+        toggleTweetLike, 
+        getLikedVideos}

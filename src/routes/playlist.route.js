@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { createPlaylist, addVideoToPlaylist, removeVideoFromPlaylist, deletePlaylist, updatePlaylist } from "../controllers/playlist.controller.js" 
+import { createPlaylist, addVideoToPlaylist, removeVideoFromPlaylist, deletePlaylist, updatePlaylist, getUserPlaylists, getPlaylistById } from "../controllers/playlist.controller.js" 
 import { upload } from "../middlewares/multer.middleware.js"
 import { verifyJWT } from "../middlewares/auth.middleware.js"
 
@@ -7,6 +7,8 @@ const router = Router()
 
 router.use(verifyJWT)
 
+router.route("/get-playlist/:playlistId").get(getPlaylistById)
+router.route("/get-user-playlists/:userId").get(getUserPlaylists)
 router.route("/create-playlist").post(upload.none(),createPlaylist)
 router.route("/update-playlist/:playlistId").patch(upload.none(),updatePlaylist)
 router.route("/add-video-to-playlist/playlist/:playlistId/video/:videoId").patch(upload.none(),addVideoToPlaylist)

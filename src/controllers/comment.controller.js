@@ -5,55 +5,95 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Video } from "../models/video.model.js"
 
-// const getVideoComments = asyncHandler((req,res)=>{
-//     const { videoId } = req.params
-//     const {page = 1,limit = 10} = req.query
+const getVideoComments = asyncHandler(async (req, res) => {
+    const { videoId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
 
-//     if(!videoId){
-//         return ApiError(401,"requested video is invalid")
-//     }
+    if (!videoId) {
+        throw new ApiError(401, "Requested video is invalid");
+    }
 
-//     const requestedVideo = await Video.findById(videoId)
+    if (!mongoose.Types.ObjectId.isValid(videoId)) {
+        throw new ApiError(401, "Invalid ObjectId format");
+    }
 
-//     if(!requestedVideo){
-//         return ApiError(401,"requested video doesn't exsists")
-//     }
-    
-//     const skip = (Number(page) - 1) * Number(limit)
+    const requestedVideo = await Video.findById(videoId);
+    if (!requestedVideo) {
+        throw new ApiError(401, "Requested video doesn't exist");
+    }
 
-//     // const comments = await Comment.find({video:requestedVideo._id})
-//     //   .sort({ createdAt: -1 })
-//     //   .skip(Number(skip))
-//     //   .limit(Number(limit));
+    const CommentsAggregate = Comment.aggregate([
+        { 
+            $match: { video: new mongoose.Types.ObjectId(videoId) } 
+        },
+        { 
+            $lookup: { 
+                from: "users", 
+                localField: "owner", 
+                foreignField: "_id", 
+                as: "owner" 
+            } 
+        },
+        { 
+            $lookup: { 
+                from: "likes", 
+                localField: "_id", 
+                foreignField: "comment", 
+                as: "commentLikes" 
+            } 
+        },
+        { 
+            $addFields: { 
+                noOfLikes: { $size: "$commentLikes" }, 
+                owner: { 
+                    $first: {
+                        $map: {
+                            input: "$owner",
+                            as: "owner",
+                            in: {
+                                username: "$$owner.username",
+                                fullName: "$$owner.fullName",
+                                avatar: "$$owner.avatar"
+                            }
+                        }
+                    }
+                },
+                isLiked: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$commentLikes.likedBy"] },
+                        then: true,
+                        else: false
+                    }
+                }
+            } 
+        },
+        { 
+            $sort: { createdAt: -1 } 
+        },
+        { 
+            $project: { 
+                _id: 1, 
+                content: 1, 
+                createdAt: 1, 
+                noOfLikes: 1, 
+                "owner.avatar.url": 1, 
+                "owner.username": 1, 
+                "owner.fullName": 1, 
+                isLiked: 1 
+            } 
+        }
+    ]);
 
-//     const commentsAgrregate = Comment.aggregate([
-//         {
-//             $match:{
-//                 video:mongoose.Types.ObjectId(requestedVideo._id)
-//             },
-//             {
+    const options = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10)    
+    };
 
+    const comments = await Comment.aggregatePaginate(CommentsAggregate, options);
 
-//             }
-//         }
-//     ])
+    return res.status(200).json(new ApiResponse(200, comments, "Comments fetched successfully"));
+});
 
-
-//     const totalNoOfComments = await Comment.countDocuments();
-
-//     res.status(200).json(new ApiResponse(
-//         200,
-//         {
-//             totalNoOfComments,
-//             page:Number(page),
-//             limit:Nmber(limit),
-//             totalPages:Math.ceil(totalNoOfComments/Number(limit)),
-//             comments,
-//         },
-//         "Comments fetched successfully."
-//     )) 
- 
-// })
 
 const addComment = asyncHandler(async (req, res) => {
     const { videoId } = req.params
@@ -148,5 +188,6 @@ const deleteComment = asyncHandler(async (req, res) => {
 export {
     deleteComment,
     updateComment,
-    addComment
+    addComment,
+    getVideoComments
 }

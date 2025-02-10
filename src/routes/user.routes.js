@@ -24,9 +24,9 @@ router.route("/logout").post(verifyJWT,logoutUser)
 
 router.route("/refresh-tokens").post(refereshAccessToken)
 
-router.route("/update-password").post(verifyJWT,updatePasswordUser)
+router.route("/update-password").patch(verifyJWT,updatePasswordUser)
 
-router.route("/update-details").post(verifyJWT,updateDetailsUser)
+router.route("/update-details").patch(verifyJWT,updateDetailsUser)
 
 router.route("/update-avatar").patch(verifyJWT,upload.single("avatar"),updateAvatarUser)
 

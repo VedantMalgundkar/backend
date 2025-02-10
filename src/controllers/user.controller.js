@@ -103,7 +103,7 @@ const loginUser = asyncHandler(async (req, res) =>{
     //send cookie
 
     const {email, username, password} = req.body
-
+    
     if (!username && !email) {
         throw new ApiError(400, "username or email is required")
     }
@@ -235,37 +235,32 @@ const updatePasswordUser = asyncHandler(async(req,res)=>{
 })
 
 const updateDetailsUser = asyncHandler(async (req,res)=>{
-    const {fullName,email} = req.body
+    const {fullName,email,username} = req.body
 
-    if (!fullName && !email){
+    if (!fullName && !email && !username){
         throw new ApiError(401,"Atleast one field shoud be there.")
     }
 
-    try {
-        if (fullName) {
-            const result = await User.updateOne(
-                { _id : req.user?._id },
-                { $set: { fullName: fullName } }   
-            );
-        }
-    } catch (error) {
-        throw new ApiError(401,error?.message|| "fullName update failed")
-        
-    }
-    try {
-        if (email) {
-            const result = await User.updateOne(
-                { _id : req.user?._id },
-                { $set: { email: email } }   
-            );
-        }
-    } catch (error) {
-        throw new ApiError(401,error?.message|| "email update failed")
-        
+    const updateData = {}
+
+    if (fullName) updateData.fullName = fullName;
+    if (email) updateData.email = email;
+    if (username) updateData.username = username;
+
+
+    const result = await User.findByIdAndUpdate(
+        req.user?._id,
+        { $set: updateData },
+        {new:true}
+        ).select("-password -refreshToken");
+
+
+    if(!result){
+        throw new ApiError(401,error?.message|| "user updates failed")
     }
 
     res.status(200)
-    .json(new ApiResponse(200,{},"data updated successfully"))
+    .json(new ApiResponse(200,result,"data updated successfully"))
 
 })
 
@@ -367,7 +362,7 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
         throw new ApiError(403,"username is invalid")
     }
 
-    userChannel = await User.findOne({username:username})
+    const userChannel = await User.findOne({username:username})
 
     if (!userChannel){
         throw new ApiError(402,"Channel does not exsists")
